@@ -238,7 +238,7 @@ void TimerWheel_Adance(TimerWheel* timer, uint32_t Add_ms);
 
 最终效果：分配 / 释放都是 O(1)，且因为内存池按固定大小的块管理（而非像通用堆那样处理任意大小请求），不会产生外部碎片。
 
-<img src="./images/design_memorypool.png" style="width:5.76806in;height:3.63958in" />
+![内存池设计图](./images/design_memorypool.png)
 
 ---
 
