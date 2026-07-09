@@ -1,0 +1,20 @@
+--target=arm-none-eabi
+-mthumb
+-std=gnu11
+-mcpu=cortex-m4
+-mfpu=fpv4-sp-d16
+-mfloat-abi=hard
+-DUSE_STDPERIPH_DRIVER
+-DSTM32F40_41xxx
+-isystem
+C:/Program Files/Arm/gcc-arm-none-eabi/arm-none-eabi/include
+-isystem
+C:/Program Files/Arm/gcc-arm-none-eabi/lib/gcc/arm-none-eabi/15.2.1/include
+-IFunc
+-IHardware
+-ILibrary
+-IMemoryPool
+-IStart
+-ISystem
+-ITimer_Wheel
+-IUser

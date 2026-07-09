@@ -1,0 +1,35 @@
+{
+  "configurations": [
+    {
+      "name": "windows-gcc-arm",
+      "includePath": [
+        "${workspaceFolder}/**",
+        "${workspaceFolder}/User/**",
+        "${workspaceFolder}/Hardware/**",
+        "${workspaceFolder}/System/**",
+        "${workspaceFolder}/Start/**",
+        "${workspaceFolder}/Library/**",
+        "D:/KeilMDK/ARM/ARM/ARMCLANG/include/"
+      ],
+      "defines": [
+        "USE_STDPERIPH_DRIVER",
+        "STM32F40_41xxx"
+      ],
+      "compilerPath": "C:/Program Files/Arm/gcc-arm-none-eabi/bin/arm-none-eabi-gcc.exe",
+      "cStandard": "c11",
+      "intelliSenseMode": "windows-gcc-arm",
+      "browse": {
+        "path": [
+          "${workspaceFolder}",
+          "./Library",
+          "./System",
+          "./Hardware",
+          "./Start"
+        ],
+        "limitSymbolsToIncludedHeaders": true
+      },
+      "cppStandard": "${default}"
+    }
+  ],
+  "version": 4
+}
