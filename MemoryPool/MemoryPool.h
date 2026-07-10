@@ -6,7 +6,10 @@
 #include "Error.h"
 #include "Func.h"
 #include "Memory_config.h"
-
+#if MEMPOOL_MULTI_TASK_SAFE
+#include "FreeRTOS.h"
+#include "semphr.h"
+#endif
 typedef struct MemoryPool MemoryPool;
 typedef struct MemoryPoolOpt MemoryPoolOpt;
 
@@ -43,6 +46,9 @@ struct MemoryPool {
 #if OBSERVER_MODE
     Observer observer;
 #endif
+#if MEMPOOL_MULTI_TASK_SAFE
+    SemaphoreHandle_t lock;
+#endif
     BlockListNode* freelist;  // 全局空闲链
     MemoryPoolOpt opt;
     char space[];  // 整块内存
@@ -63,7 +69,4 @@ ERRCODE MemoryPool_Free(MemoryPool* pool, void* obj);
 ERRCODE MemoryPool_Destory(MemoryPool** pool);
 ERRCODE MemoryPool_Check(const MemoryPool* pool, char* msg, size_t len);
 void MemoryPool_Observer(const MemoryPool* pool, char* msg, size_t len);
-ERRCODE MemoryPool_MemSet_Zero(MemoryPool* pool);
-ERRCODE MemoryPool_Index(MemoryPool* pool, void* data, uint16_t* index);
-void* MemoryPool_GetByIndex(MemoryPool* pool, uint16_t index);
 #endif

@@ -2,7 +2,6 @@
 #include "MemoryPool.h"
 
 #include <stdlib.h>
-#include <string.h>
 
 #include "Memory_config.h"
 #define MEMPOOL_ALIGN_SIZE 4U
@@ -99,6 +98,9 @@ ERRCODE create_MemoryPool(size_t block_size, size_t count, MemoryPool** pool) {
         *pool = NULL;
         return ERROR(ERR_MEM);
     }
+#if MEMPOOL_MULTI_TASK_SAFE
+    (*pool)->lock = (uint32_t)xSemaphoreCreateMutex();
+#endif
     MemoryPool_init(*pool, block_size, count);
     // 初始化内存池的块
     Block_Init(*pool);
@@ -128,12 +130,12 @@ static inline ERRCODE Block_Check(MemoryPool* pool, void* obj,
         }
         // 因为每个块大小是一致的所以这个指针减去起始地址肯定是 block_real_size
         // 的倍数
-        if (((addr - start) % pool->block_real_size) != 0) {
-#if OBSERVER_MODE
-            pool->observer.wild_free_count++;
-#endif
-            return ERROR(ERR_OPT, "当前指针不是合法block起始地址");
-        }
+        //         if (((addr - start) % pool->block_real_size) != 0) {
+        // #if OBSERVER_MODE
+        //             pool->observer.wild_free_count++;
+        // #endif
+        //             return ERROR(ERR_OPT, "当前指针不是合法block起始地址");
+        //         }
     }
 #endif
 // 检查这个指针是否被重复释放
@@ -178,8 +180,9 @@ void* MemoryPool_Alloc(MemoryPool* pool) {
     if (!pool) {
         return NULL;
     }
-
-    MEMPOOL_LOCK();
+#if MEMPOOL_MULTI_TASK_SAFE
+    MEMPOOL_LOCK(pool->lock);
+#endif
 
     // 从空闲块列表中获取一个块
     BlockListNode* node = BlockList_pop(&pool->freelist);
@@ -188,7 +191,9 @@ void* MemoryPool_Alloc(MemoryPool* pool) {
 #if OBSERVER_MODE
         pool->observer.alloc_fail_count++;
 #endif
-        MEMPOOL_UNLOCK();
+#if MEMPOOL_MULTI_TASK_SAFE
+        MEMPOOL_UNLOCK(pool->lock);
+#endif
         return NULL;
     }
 #if MEMPOOL_CHECK_FREE
@@ -199,8 +204,9 @@ void* MemoryPool_Alloc(MemoryPool* pool) {
     pool->observer.peak_used_block_count = MAX(
         pool->observer.peak_used_block_count, pool->observer.used_block_count);
 #endif
-
-    MEMPOOL_UNLOCK();
+#if MEMPOOL_MULTI_TASK_SAFE
+    MEMPOOL_UNLOCK(pool->lock);
+#endif
 
     return (void*)((uint8_t*)node + sizeof(BlockListNode));
 }
@@ -209,17 +215,22 @@ ERRCODE MemoryPool_Free(MemoryPool* pool, void* obj) {
         return ERROR(ERR_PTR_NULL);
     }
     BlockListNode* node = NULL;
+#if MEMPOOL_WILD_FREE_CHECK || MEMPOOL_CHECK_FREE || MEMPOOL_MAGIC || \
+    MEMPOOL_CANARY
     // 先检查这个指针是否合法
     ERRCODE ret = Block_Check(pool, obj, &node);
     if (ret != ERR_OK) {
         return ret;
     }
+#endif
 
 #if MEMPOOL_CHECK_FREE
     node->state = 1;  // free
 #endif
 
-    MEMPOOL_LOCK();
+#if MEMPOOL_MULTI_TASK_SAFE
+    MEMPOOL_LOCK(pool->lock);
+#endif
 
     // 将这个块节点放回空闲块列表
 
@@ -231,7 +242,9 @@ ERRCODE MemoryPool_Free(MemoryPool* pool, void* obj) {
     }
 #endif
 
-    MEMPOOL_UNLOCK();
+#if MEMPOOL_MULTI_TASK_SAFE
+    MEMPOOL_UNLOCK(pool->lock);
+#endif
 
     return ERR_OK;
 }
@@ -336,41 +349,13 @@ ERRCODE MemoryPool_Destory(MemoryPool** pool) {
     if (!pool || !(*pool)) {
         return ERR_OK;
     }
+#if OBSERVER_MODE
     if ((*pool)->observer.used_block_count != 0) {
         return ERROR(ERR_OPT, "当前内存池有未归还资源");
     }
+#endif
 
     free(*pool);
     *pool = NULL;
     return ERR_OK;
-}
-ERRCODE MemoryPool_MemSet_Zero(MemoryPool* pool) {
-    if (!pool) {
-        return ERROR(ERR_PTR_NULL);
-    }
-    for (uint32_t i = 0; i < pool->block_num; i++) {
-        uint8_t* block_base = (uint8_t*)pool->space + i * pool->block_real_size;
-
-        uint8_t* user_area = block_base + sizeof(BlockListNode);
-        memset(user_area, 0, pool->block_size);
-    }
-    return ERR_OK;
-}
-ERRCODE MemoryPool_Index(MemoryPool* pool, void* data, uint16_t* index) {
-    if (!pool) {
-        return ERR_PTR_NULL;
-    }
-    uint32_t start = (uint32_t)pool->space;
-    uint32_t end = start + pool->block_num * pool->block_real_size;
-    if ((uint32_t)data < start || (uint32_t)data >= end) {
-        return ERR_ARGS;
-    }
-    *index = ((uint32_t)data - start) / pool->block_real_size;
-    return ERR_OK;
-}
-void* MemoryPool_GetByIndex(MemoryPool* pool, uint16_t index) {
-    if (!pool) {
-        return NULL;
-    }
-    return pool->space + index * pool->block_real_size + sizeof(BlockListNode);
 }
